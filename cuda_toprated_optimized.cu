@@ -63,13 +63,16 @@ __global__ void aggregate(int *product_ids, float *ratings, float *sums, int *co
     }
 }
 
-// CUDA kernel for average computation
+// CUDA kernel for average computation with thread coarsening
 __global__ void compute_average(float *sums, int *counts, float *averages, int M)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < M && counts[idx] > 0)
-    {
-        averages[idx] = sums[idx] / counts[idx];
+    int stride = blockDim.x * gridDim.x; // Interleaving stride
+
+    for (int i = idx; i < M; i += stride) {
+        if (counts[i] > 0) {
+            averages[i] = sums[i] / counts[i];
+        }
     }
 }
 
