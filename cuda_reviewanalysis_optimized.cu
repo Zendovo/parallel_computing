@@ -9,7 +9,7 @@
 
 using json = nlohmann::json;
 
-static const int THREADS_PER_BLOCK = 512;
+static const int THREADS_PER_BLOCK = 256;
 
 #define MAX_BINS_PER_BLOCK 512  // Max bins per block, configurable
 
