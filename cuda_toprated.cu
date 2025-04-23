@@ -39,10 +39,10 @@ int main()
     std::vector<int> product_ids;
     std::vector<float> ratings;
 
-    // --- STEP 1: Parse and Map ASIN to product_id ---
+    // Parse and Map ASIN to product_id
     std::ifstream infile("reviews.csv");
     std::string line;
-    std::getline(infile, line); // Skip header
+    std::getline(infile, line);
 
     while (std::getline(infile, line))
     {
@@ -73,7 +73,7 @@ int main()
     int num_products = id_to_asin.size();
     std::cout << "Parsed " << num_reviews << " reviews for " << num_products << " products.\n";
 
-    // --- STEP 2: Allocate GPU memory ---
+    // Allocate GPU memory
     int *d_product_ids, *d_counts;
     float *d_ratings, *d_sums, *d_averages;
 
@@ -86,7 +86,7 @@ int main()
     cudaMemset(d_sums, 0, num_products * sizeof(float));
     cudaMemset(d_counts, 0, num_products * sizeof(int));
 
-    // --- STEP 3: Copy data to GPU ---
+    // Copy data to GPU
     cudaMemcpy(d_product_ids, product_ids.data(), num_reviews * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(d_ratings, ratings.data(), num_reviews * sizeof(float), cudaMemcpyHostToDevice);
 
@@ -96,13 +96,13 @@ int main()
 
     cudaEventRecord(start);
 
-    // --- STEP 4: Launch Aggregation Kernel ---
+    // Launch Aggregation Kerne
     int blockSize = 256;
     int gridSize = (num_reviews + blockSize - 1) / blockSize;
     aggregate<<<gridSize, blockSize>>>(d_product_ids, d_ratings, d_sums, d_counts, num_reviews);
     cudaDeviceSynchronize();
 
-    // --- STEP 5: Launch Averaging Kernel ---
+    // Launch Averaging Kernel
     gridSize = (num_products + blockSize - 1) / blockSize;
     compute_average<<<gridSize, blockSize>>>(d_sums, d_counts, d_averages, num_products);
     cudaDeviceSynchronize();
@@ -117,11 +117,11 @@ int main()
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
-    // --- STEP 6: Copy averages back to CPU ---
+    // Copy averages back to CPU
     std::vector<float> averages(num_products);
     cudaMemcpy(averages.data(), d_averages, num_products * sizeof(float), cudaMemcpyDeviceToHost);
 
-    // --- STEP 7: Find Top-10 Products ---
+    // Find Top-10 Products
     std::vector<std::pair<std::string, float>> result;
     for (int i = 0; i < num_products; ++i)
     {
@@ -131,6 +131,7 @@ int main()
         }
     }
 
+    // Using partial_sort to find top 10 products
     std::partial_sort(result.begin(), result.begin() + 10, result.end(),
                       [](const auto &a, const auto &b)
                       {
@@ -143,7 +144,7 @@ int main()
         std::cout << result[i].first << " -> " << result[i].second << "\n";
     }
 
-    // --- Cleanup ---
+    // Free GPU memory
     cudaFree(d_product_ids);
     cudaFree(d_ratings);
     cudaFree(d_sums);

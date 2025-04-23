@@ -11,6 +11,7 @@ using json = nlohmann::json;
 
 static const int THREADS_PER_BLOCK = 512;
 
+// Kernel to aggregate scores using atomic operations
 __global__ void aggregateScores(float *device_scores, int *device_indices,
                                 float *device_final_scores, int total_elements) {
     int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
@@ -19,6 +20,7 @@ __global__ void aggregateScores(float *device_scores, int *device_indices,
     }
 }
 
+// Kernel to count sentiments (positive, negative, neutral) using atomic operations
 __global__ void countSentiments(float *device_final_scores, int *device_counts, int total_reviews) {
     int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -34,6 +36,7 @@ __global__ void countSentiments(float *device_final_scores, int *device_counts, 
     }
 }
 
+// Tokenize a string based on a separator
 std::vector<std::string> tokenize(const std::string &text, const std::string &separator) {
     std::vector<std::string> result;
     size_t start_pos = 0;
@@ -48,6 +51,7 @@ std::vector<std::string> tokenize(const std::string &text, const std::string &se
 }
 
 int main() {
+    // Load sentiment lexicon from file into a hash map
     std::ifstream lexicon_input("./vader_lexicon.txt");
     if (!lexicon_input.is_open()) {
         std::cerr << "Error: Unable to open lexicon file" << std::endl;
@@ -56,6 +60,7 @@ int main() {
 
     std::unordered_map<std::string, float> lexicon_map;
 
+    // Parse lexicon file and populate the hash map
     std::string lexicon_line;
     while (std::getline(lexicon_input, lexicon_line)) {
         std::string word, score;
@@ -72,6 +77,7 @@ int main() {
 
     std::cout << "Lexicon entries loaded: " << lexicon_map.size() << std::endl;
 
+    // Read and process reviews from a JSON file
     std::ifstream reviews_file("./Electronics_5.json");
     if (!reviews_file.is_open()) {
         std::cerr << "Error: Unable to open reviews file" << std::endl;
@@ -81,6 +87,7 @@ int main() {
     std::vector<float> host_scores;
     std::vector<int> host_indices;
 
+    // Parse reviews and calculate sentiment scores
     std::string review_line;
     int review_count = 0;
     const std::string separator = " ";
@@ -112,6 +119,7 @@ int main() {
     }
     reviews_file.close();
 
+    // Allocate memory on the GPU for scores and indices
     float *device_scores, *device_final_scores, *host_final_scores;
     int *device_indices;
 
@@ -124,6 +132,7 @@ int main() {
 
     cudaMemset(device_final_scores, 0, review_count * sizeof(float));
 
+    // Launch kernel to aggregate scores
     int blocks = (host_scores.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
     cudaEvent_t start, stop;
@@ -146,9 +155,11 @@ int main() {
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
+    // Copy results back to host memory
     host_final_scores = (float *)malloc(review_count * sizeof(float));
     cudaMemcpy(host_final_scores, device_final_scores, review_count * sizeof(float), cudaMemcpyDeviceToHost);
 
+    // Allocate memory for sentiment counts and launch kernel to count sentiments
     int *device_counts;
     int host_counts[3] = {0, 0, 0}; // [positive, negative, neutral]
 
@@ -160,11 +171,13 @@ int main() {
 
     cudaMemcpy(host_counts, device_counts, 3 * sizeof(int), cudaMemcpyDeviceToHost);
 
+    // Print sentiment analysis results
     std::cout << "Total reviews: " << review_count << std::endl
               << "Positive: " << host_counts[0] << std::endl
               << "Negative: " << host_counts[1] << std::endl
               << "Neutral: " << host_counts[2] << std::endl;
 
+    // Free GPU and host memory
     cudaFree(device_counts);
     free(host_final_scores);
     cudaFree(device_scores);
