@@ -38,7 +38,7 @@ The optimized kernels ran **0.16ms faster than the baseline i.e. 8.6% faster**. 
 lack of performance increase could be due to the skew in data being minimal causing very low
 contention among the threads.
 
-### Lexicon Sentiment Analyzer
+## Lexicon Sentiment Analyzer
 
 This computational task also maps naturally to a **parallel histogram** problem as referenced
 from R6 where each reviewID corresponds to a histogram bin. The main challenges are load
@@ -88,8 +88,7 @@ There was a decent increase in the performance of the optimized version ignoring
 without it the kernel was ran multiple times in the same code and best of 2 were averaged), on
 an average, **a 0.5ms improvement was recorded i.e. 23% improvement.**
 
-
-### Elaborate Reviewers List
+## Elaborate Reviewers List
 
 Elaborate reviewers are defined as those who have written at least 5 reviews with 50 or more
 words each. This task requires parsing a large dataset, analyzing the review text, and
