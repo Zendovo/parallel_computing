@@ -9,27 +9,27 @@ and handling concurrent updates to the same bin (i.e., product ID).
 The original dataset is in JSON format with fields like reviewerID, asin, reviewText, and
 overall. For faster parsing and reduced overhead, the dataset is preprocessed to CSV format
 containing only two columns:
-● asin (Amazon Standard Identification Number, a unique product ID)
-● overall (the rating score as a float)
+- asin (Amazon Standard Identification Number, a unique product ID)
+- overall (the rating score as a float)
 This CSV format reduces parsing complexity and speeds up the loading process for
 experimentation and testing.
 
 ### Optimized CUDA Kernel Design:
 
 1. **Privatization with Shared Memory Bins** :
-    ○ Each thread block uses shared memory to maintain a local hash table
+    - Each thread block uses shared memory to maintain a local hash table
        (bin_pids, bin_sums, bin_counts) that maps hashed product IDs to
        aggregate values.
-    ○ These shared bins reduce global memory contention by localizing frequent
+    - These shared bins reduce global memory contention by localizing frequent
        writes.
 2. **Linear Probing in Shared Memory** :
-    ○ A simple hash function (pid % MAX_BINS_PER_BLOCK) is used.
-    ○ Collisions are resolved with linear probing.
+    - A simple hash function (pid % MAX_BINS_PER_BLOCK) is used.
+    - Collisions are resolved with linear probing.
 3. **Thread Coarsening with Interleaving** :
-    ○ Each thread is responsible for processing multiple reviews with a difference of
+    - Each thread is responsible for processing multiple reviews with a difference of
        total_threads, improving memory throughput and latency hiding.
 4. **Final Aggregation to Global Memory** :
-    ○ Once all threads finish populating shared bins, the block-level aggregates are
+    - Once all threads finish populating shared bins, the block-level aggregates are
        flushed to global memory using atomicAdd.
 
 ### Practical Performance Comparison:
@@ -49,37 +49,36 @@ balancing and handling concurrent updates to the same bin (i.e., review ID).
 The input data is in JSON format, where each line contains a review with a reviewText field.
 Preprocessing involves:
 
-
-● Tokenizing each reviewText using space as a delimiter.
-● Mapping each token to its sentiment score using the VADER lexicon.
-● Associating each valid score with the corresponding review index.
+- Tokenizing each reviewText using space as a delimiter.
+- Mapping each token to its sentiment score using the VADER lexicon.
+- Associating each valid score with the corresponding review index.
 The result is two arrays:
-● host_scores: sentiment scores of valid tokens.
-● host_indices: corresponding review indices.
+- host_scores: sentiment scores of valid tokens.
+- host_indices: corresponding review indices.
 These arrays are then transferred to the GPU for aggregation.
 
 ### Optimized CUDA Kernel Design:
 
 **1. Score Aggregation Kernel (aggregateScores):**
-    ● Shared memory bins are used to locally aggregate sentiment scores per review index
+    - Shared memory bins are used to locally aggregate sentiment scores per review index
        within each block.
-    ● Hashing is used to assign each review index to a shared memory bin.
-    ● Linear probing resolves collisions.
-    ● After local aggregation, results are flushed to global memory using atomicAdd.
+    - Hashing is used to assign each review index to a shared memory bin.
+    - Linear probing resolves collisions.
+    - After local aggregation, results are flushed to global memory using atomicAdd.
 **2. Sentiment Classification Kernel (countSentimentsOptimized):**
-    ● Shared memory counters tally the number of positive, negative, and neutral reviews per
+    - Shared memory counters tally the number of positive, negative, and neutral reviews per
        block.
-    ● After local aggregation, the results are added to global memory counters.
+    - After local aggregation, the results are added to global memory counters.
 
 ### Key CUDA Optimizations:
 
-● Shared Memory Binning : Reduces contention on global memory by aggregating values
+- Shared Memory Binning : Reduces contention on global memory by aggregating values
 within blocks.
-● Hashing with Collision Resolution : Hash review indices to shared memory bins, using
+- Hashing with Collision Resolution : Hash review indices to shared memory bins, using
 linear probing for conflicts.
-● Thread Interleaving : Each thread processes multiple data points in a strided manner to
+- Thread Interleaving : Each thread processes multiple data points in a strided manner to
 improve throughput and memory access efficiency.
-● Atomic Operations : Used for correctness during concurrent updates in both shared and
+- Atomic Operations : Used for correctness during concurrent updates in both shared and
 global memory.
 
 ### Practical Performance Comparison:
@@ -103,23 +102,23 @@ The implementation involves two versions:
 ### Input Format and Processing:
 
 The input dataset contains Amazon product reviews in CSV format with at least two columns:
-● reviewerID: A unique identifier for each reviewer
-● reviewText: The text content of the review
+- reviewerID: A unique identifier for each reviewer
+- reviewText: The text content of the review
 
 #### The processing involves:
 
-● Parsing each review line
-● Counting words in the review text
-● Tracking elaborate reviews per reviewer using a hash table
-● Identifying reviewers who meet the criteria (≥5 reviews with ≥50 words)
+- Parsing each review line
+- Counting words in the review text
+- Tracking elaborate reviews per reviewer using a hash table
+- Identifying reviewers who meet the criteria (≥5 reviews with ≥50 words)
 
 ### Sequential Implementation Design:
 
 The sequential implementation (c_elaborate.c) uses the following approach:
-● Hash table with linear probing to store reviewer information
-● Single-threaded parsing of the CSV file, line by line
-● In-memory aggregation of reviewer statistics
-● Final traversal to identify elaborate reviewers
+- Hash table with linear probing to store reviewer information
+- Single-threaded parsing of the CSV file, line by line
+- In-memory aggregation of reviewer statistics
+- Final traversal to identify elaborate reviewers
 
 #### Key components:
 
@@ -133,10 +132,10 @@ The sequential implementation (c_elaborate.c) uses the following approach:
 The OpenMP implementation (c_elaborate_openmp.c) extends the sequential version with
 parallel processing:
 
-● Thread-safe hash table with bucket-level locks
-● Parallel processing of reviews using multiple threads
-● Pre-loading of the entire file into memory for parallel access
-● Dynamic scheduling to handle load imbalance
+- Thread-safe hash table with bucket-level locks
+- Parallel processing of reviews using multiple threads
+- Pre-loading of the entire file into memory for parallel access
+- Dynamic scheduling to handle load imbalance
 
 #### Key optimizations:
 
